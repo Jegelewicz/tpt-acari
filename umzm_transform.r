@@ -13,12 +13,12 @@ name_length <- function(x) ifelse(!is.na(x), length(unlist(strsplit(x, ' '))), 0
 
 # define right function
 right = function (string, char) {
-  substr(string,(char + 1),nchar(string))
+  substr(string,(unlist(lapply(gregexpr(pattern = char, string), min)) + 1),nchar(string))
 }
 
 # define left function
 left = function (string,char) {
-  substr(string,1,char - 1)
+  substr(string,1,unlist(lapply(gregexpr(pattern = char, string), min)))
 }
 
 # read in file
@@ -72,8 +72,8 @@ cols_to_be_rectified <- names(df)[vapply(df, is.character, logical(1))]
 df[,c(cols_to_be_rectified) := lapply(.SD, space_clean), .SDcols = cols_to_be_rectified]
 
 # split specificEpithet when it has two terms
-# multi_epithet <- df[which(lapply(df$specificEpithet, name_length) > 1),] # extract rows with a multi-name specifies
-# df <- df[which(lapply(df$specificEpithet, name_length) <= 1),] # extract rows with a multi-name specifies
+multi_epithet <- df[which(lapply(df$specificEpithet, name_length) > 1),] # extract rows with a multi-name specifies
+df <- df[which(lapply(df$specificEpithet, name_length) <= 1),] # extract rows with a multi-name specifies
 
 # for(i in 1:nrow(multi_epithet)){
 #   multi_epithet$specificEpithet[i] <- left(multi_epithet$species[i], unlist(gregexpr(pattern = " ", multi_epithet$species[i]))) # place first term in specificEpithet
@@ -93,20 +93,6 @@ df[,c(cols_to_be_rectified) := lapply(.SD, space_clean), .SDcols = cols_to_be_re
 # df$specificEpithet <- df$species # place single term species names in specificEpithet
 
 # df <- rbind(df,multi_epithet) # return subspecies to working file
-
-# # create scientificNameAuthorship which meets DarwinCore standard for ICZN
-# for(i in 1:nrow(df)){
-#   df$scientificNameAuthorship[i] <- ifelse(is.na(df$namePublishedInYear[i]) &
-#                                              is.na(df$author[i]), NA, # if both author and year are blank, insert NA
-#                                            ifelse(is.na(df$namePublishedInYear[i]),df$author[i], # if author is not blank but year is, insert author
-#                                                   ifelse(is.na(df$author[i]), df$namePublishedInYear[i], # if author is blank, but year is not, insert year
-#                                                          paste(df$author[i], df$namePublishedInYear[i], sep = ', ')) # if both author and year are NOT blank merge and insert
-#                                            )
-#   )
-# }
-# 
-# fixAuth <- function(x) ifelse(grepl('[a-z]),',x), paste(gsub(')', '',x),')',sep=''),x) # define function to fix cases like: (Jordan & Rothschild), 1922
-# df$scientificNameAuthorship <- fixAuth(df$scientificNameAuthorship) # apply fix
 
 # cast canonical name
 df$canonicalName <- NA # create column for canonicalName
@@ -199,14 +185,14 @@ higher_taxa$scientificName <- ifelse(is.na(higher_taxa$scientificNameAuthorship)
 # Extract rows from higher taxa that need review
 flag <- c('review')
 review_canonical <- higher_taxa[(higher_taxa$canonical %in% flag), ]
-write.csv(review_canonical,"~/GitHub/tpt-acari/output/review_canonical.csv", row.names = FALSE) # these need review
-higher_taxa <- higher_taxa[(higher_taxa$canonical %!in% flag), ] # extract review items from higher_taxa
 
 if(nrow(review_canonical) == 0){
   print('No canonical names in higher_taxa have been flagged for review. Proceed to deduplication.')
   df <- rbind(higher_taxa, df) # add higher taxa back to df for remainder of de-duplication
 } else{
-  stop('Open the review_canonical file in the output folder, make adjustments as appropriate and save the revised file to input as reviewed_canonical.xlsx before proceeding')
+  write.csv(review_canonical,"~/GitHub/tpt-acari/output/review_canonical.csv", row.names = FALSE) # these need review
+  higher_taxa <- higher_taxa[(higher_taxa$canonical %!in% flag), ] # extract review items from higher_taxa
+    stop('Open the review_canonical file in the output folder, make adjustments as appropriate and save the revised file to input as reviewed_canonical.xlsx before proceeding')
   
   # after review add back cleaned up names
   reviewed_canonical <- read_excel("input/reviewed_canonical.xlsx") # read in cleaned review file
@@ -264,9 +250,9 @@ df <- df[,c("TPTdataset",
 )]
 
 # review for duplicates
-dupe <- df[,c('canonicalName','taxonRank')] # select columns to check duplicates
+dupe <- df[,c('canonicalName')] # select columns to check duplicates
 review_dups <- df[duplicated(dupe) | duplicated(dupe, fromLast=TRUE),]
-df <- anti_join(df, review_dupes, by = "TPTID") # remove duplicate rows from working file
+df <- anti_join(df, review_dups, by = "TPTID") # remove duplicate rows from working file
 
 # write and review duplicates then add back to working file
 write.csv(review_dups,"~/GitHub/tpt-acari/output/review_duplicates.csv", row.names = FALSE) # these need review
