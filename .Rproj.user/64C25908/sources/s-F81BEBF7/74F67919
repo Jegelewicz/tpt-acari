@@ -1,0 +1,27 @@
+{
+    "id": "74F67919",
+    "path": "~/GitHub/tpt-acari/lib_func.r",
+    "project_path": "lib_func.r",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1619630802913.0,
+    "source_on_save": false,
+    "relative_order": 3,
+    "properties": {
+        "tempName": "Untitled1",
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "89,0",
+        "scrollLine": "76"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1619631239,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1619631239513,
+    "read_only": false,
+    "read_only_alternatives": []
+}

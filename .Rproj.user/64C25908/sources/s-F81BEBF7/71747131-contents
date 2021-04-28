@@ -1,30 +1,6 @@
-# add libraries
-library(readxl)
-library(data.table)
-library(stringi)
-library(taxotools)
-library(dplyr)
-
-# define function: name length
-name_length <- function(x) ifelse(!is.na(x), length(unlist(strsplit(x, ' '))), 0)
-
-# define function: is not in
-'%!in%' <- function(x,y)!('%in%'(x,y))
-
-# define right function
-right = function (string, char) {
-  substr(string,(unlist(lapply(gregexpr(pattern = char, string), min)) + 1),nchar(string))
-}
-
-# define left function
-left = function (string,char) {
-  substr(string,1,unlist(lapply(gregexpr(pattern = char, string), min)))
-}
-
 # read in file
 mite_may_2020 <- read_excel("input/mite may 2020.xlsx", col_types = c("text", "text", "text", "text", "text", "text", "text", "text", "text", "text", "text", "text", "text", "text", "text", "text", "text"))
 df <- mite_may_2020 # change filename for ease of use
-# df <- df[-which(apply(df,1,function(x)all(is.na(x)))),] # remove empty rows
 original_rows <- nrow(df)
 tpt_dwc_template <- read_excel("input/tpt_dwc_template.xlsx") # read in TPT DarwinCore template
 tpt_dwc_template[] <- lapply(tpt_dwc_template, as.character) # set all columns in template to character
@@ -32,67 +8,19 @@ tpt_dwc_template[] <- lapply(tpt_dwc_template, as.character) # set all columns i
 # transform column headers
 colnames(df) <- tolower(colnames(df)) # lower case column names
 
-# define DwC conversion
-convert2DwC <- function(df_colname) {
-  x <- gsub('.*subspecies.*','infraspecificEpithet',df_colname)
-  x <- gsub('.*rank.*','taxonRank',x)
-  x <- gsub('.*author.*','scientificNameAuthorship',x)
-  x <- gsub('.*species.*','specificEpithet',x)
-  x
-}
-
 colnames(df) <- convert2DwC(colnames(df)) # convert to DarwinCore terms
 
 df <- rbindlist(list(df, tpt_dwc_template), fill = TRUE) # add all DwC columns
 
-df$TPTdataset <- "UMZM" # add dataset name
-df$TPTID <- seq.int(nrow(df)) # add numeric ID for each name
+df$source <- "UMZM" # add dataset name
+df$taxonID <- seq.int(nrow(df)) # add numeric ID for each name
 
 df$kingdom <- "Animalia" # add kingdom
 df$phylum <- "Arthropoda" # add phylum
 
-# clean up
-# define function: remove '\xa0' chars and non-conforming punctuation
-phrase_clean <- function(x) gsub("[^[:alnum:][:blank:]&,()];", "", x)
-space_clean <- function(x) gsub("  ", " ", x)
-
-# remove remove '\xa0' chars
-setDT(df)
-cols_to_be_rectified <- names(df)[vapply(df, is.character, logical(1))]
-df[,c(cols_to_be_rectified) := lapply(.SD, phrase_clean), .SDcols = cols_to_be_rectified]
-
-# strip spaces from ends of strings
-setDT(df)
-cols_to_be_rectified <- names(df)[vapply(df, is.character, logical(1))]
-df[,c(cols_to_be_rectified) := lapply(.SD, trimws), .SDcols = cols_to_be_rectified]
-
-# strip double spaces
-setDT(df)
-cols_to_be_rectified <- names(df)[vapply(df, is.character, logical(1))]
-df[,c(cols_to_be_rectified) := lapply(.SD, space_clean), .SDcols = cols_to_be_rectified]
-
-# split specificEpithet when it has two terms
-multi_epithet <- df[which(lapply(df$specificEpithet, name_length) > 1),] # extract rows with a multi-name specifies
-df <- df[which(lapply(df$specificEpithet, name_length) <= 1),] # extract rows with a multi-name specifies
-
-# for(i in 1:nrow(multi_epithet)){
-#   multi_epithet$specificEpithet[i] <- left(multi_epithet$species[i], unlist(gregexpr(pattern = " ", multi_epithet$species[i]))) # place first term in specificEpithet
-#   multi_epithet$infraspecificEpithet[i] <- right(multi_epithet$species[i], unlist(gregexpr(pattern = " ", multi_epithet$species[i]))) # place second term in infraspecificEpithet
-# }
-# 
-# # strip spaces from ends of strings
-# setDT(multi_epithet)
-# cols_to_be_rectified <- names(multi_epithet)[vapply(multi_epithet, is.character, logical(1))]
-# multi_epithet[,c(cols_to_be_rectified) := lapply(.SD, trimws), .SDcols = cols_to_be_rectified]
-# 
-# # strip double spaces
-# setDT(multi_epithet)
-# cols_to_be_rectified <- names(multi_epithet)[vapply(multi_epithet, is.character, logical(1))]
-# multi_epithet[,c(cols_to_be_rectified) := lapply(.SD, space_clean), .SDcols = cols_to_be_rectified]
-
-# df$specificEpithet <- df$species # place single term species names in specificEpithet
-
-# df <- rbind(df,multi_epithet) # return subspecies to working file
+df <- char_fun(df,phrase_clean) # remove xa0 characters
+df <- char_fun(df,trimws) # trim white space
+df <- char_fun(df,space_clean) # change double spaces to single
 
 # cast canonical name
 df$canonicalName <- NA # create column for canonicalName
@@ -181,29 +109,9 @@ df$scientificName[i] <- for(i in 1:nrow(df)){
 # cast scientific name for genus and above
 higher_taxa$scientificName <- ifelse(is.na(higher_taxa$scientificNameAuthorship), higher_taxa$canonicalName, paste(higher_taxa$canonicalName, higher_taxa$scientificNameAuthorship, sep = " "))
 
-
-# Extract rows from higher taxa that need review
-flag <- c('review')
-review_canonical <- higher_taxa[(higher_taxa$canonical %in% flag), ]
-
-if(nrow(review_canonical) == 0){
-  print('No canonical names in higher_taxa have been flagged for review. Proceed to deduplication.')
-  df <- rbind(higher_taxa, df) # add higher taxa back to df for remainder of de-duplication
-} else{
-  write.csv(review_canonical,"~/GitHub/tpt-acari/output/review_canonical.csv", row.names = FALSE) # these need review
-  higher_taxa <- higher_taxa[(higher_taxa$canonical %!in% flag), ] # extract review items from higher_taxa
-    stop('Open the review_canonical file in the output folder, make adjustments as appropriate and save the revised file to input as reviewed_canonical.xlsx before proceeding')
-  
-  # after review add back cleaned up names
-  reviewed_canonical <- read_excel("input/reviewed_canonical.xlsx") # read in cleaned review file
-  higher_taxa <- rbind(higher_taxa, reviewed_canonical) # add reviewed higher_taxa back to the working file
-  df <- rbind(higher_taxa, df) # add higher taxa back to df for remainder of de-duplication
-}
-
 # order column names
 #df[,c(1,2,3,4)]. Note the first comma means keep all the rows, and the 1,2,3,4 refers to the columns.
-df <- df[,c("TPTdataset", 
-            "TPTID", 
+df <- df[,c("source", 
             "taxonID", 
             "scientificNameID", 
             "acceptedNameUsageID", 
@@ -249,16 +157,16 @@ df <- df[,c("TPTdataset",
             "canonicalName"
 )]
 
-# review for duplicates
-dupe <- df[,c('canonicalName')] # select columns to check duplicates
-review_dups <- df[duplicated(dupe) | duplicated(dupe, fromLast=TRUE),]
-df <- anti_join(df, review_dups, by = "TPTID") # remove duplicate rows from working file
+# # review for duplicates
+# dupe <- df[,c('canonicalName')] # select columns to check duplicates
+# review_dups <- df[duplicated(dupe) | duplicated(dupe, fromLast=TRUE),]
+# df <- anti_join(df, review_dups, by = "TPTID") # remove duplicate rows from working file
 
-# write and review duplicates then add back to working file
-write.csv(review_dups,"~/GitHub/tpt-acari/output/review_duplicates.csv", row.names = FALSE) # these need review
-print("after review of duplicates, save return file to ~/GitHub/tpt-acari/input/reviewed_duplicates.xlsx")
+# # write and review duplicates then add back to working file
+# write.csv(review_dups,"~/GitHub/tpt-acari/output/review_duplicates.csv", row.names = FALSE) # these need review
+# print("after review of duplicates, save return file to ~/GitHub/tpt-acari/input/reviewed_duplicates.xlsx")
+# 
+# reviewed_duplicates <- read_excel("input/reviewed_duplicates.xlsx") # read in cleaned duplicates
+# df <- rbind(df, reviewed_duplicates)
 
-reviewed_duplicates <- read_excel("input/reviewed_duplicates.xlsx") # read in cleaned duplicates
-df <- rbind(df, reviewed_duplicates)
-
-write.csv(df,"~/GitHub/tpt-acari/output/UMZM_Acari.csv", row.names = FALSE) # ready for analysis
+write.csv(df,"~/GitHub/tpt-acari/output/Acari_DwC.csv", row.names = FALSE) # ready for analysis
