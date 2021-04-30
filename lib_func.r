@@ -6,6 +6,7 @@ library(data.table)
 library(stringi)
 library(taxotools)
 library(dplyr)
+library(plyr)
 
 # functions
 
@@ -86,4 +87,10 @@ species_rank <- function(dat, col){ # data is dataframe, col is column where ran
   df <- df[which(lapply(df$infraspecificEpithet, name_length) != 0 | lapply(df$specificEpithet, name_length) != 0),] # remove higher taxa from working file
   dat[which(col == "species" | # keep taxa with rank species
               col == "subspecies"),] # keep taxa ranked subspecies
+}
+
+# define function: find merge problems
+merge_probs <- function(dat, datcol, taxocol, htcol){
+  not_in_taxo <- dat[datcol %!in% taxocol,] # get all rows in original data (dat) with (datcol) that does not match (taxocol)
+  problems <- not_in_taxo[not_in_taxo$taxonID %!in% htcol,] # get all rows in above that do not match  original higher geography (htcol)
 }
