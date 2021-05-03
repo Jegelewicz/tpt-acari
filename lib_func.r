@@ -94,3 +94,14 @@ merge_probs <- function(dat, datcol, taxocol, htcol){
   not_in_taxo <- dat[datcol %!in% taxocol,] # get all rows in original data (dat) with (datcol) that does not match (taxocol)
   problems <- not_in_taxo[not_in_taxo$taxonID %!in% htcol,] # get all rows in above that do not match  original higher geography (htcol)
 }
+
+rename_column <- function(dat,old,new,silent=FALSE){
+  if(old %in% colnames(dat)){
+    colnames(dat)[which(names(dat) == old)] <- new
+  } else {
+    if(!silent){
+      cat(paste("\nFieldname not found...",old))
+    }
+  }
+  return(dat)
+}
