@@ -1,4 +1,4 @@
-# read in files
+# Acari taxo conversion
 Acari <- read.csv("~/GitHub/tpt-acari/output/Acari_DwC.csv", na = "NA") # read in cleaned Acari Darwin Core file
 Acari$taxonomicStatus <- NULL # Acari does not contain status, so NULL it
 Acari_ht <- higher_taxa_rank(Acari, Acari$taxonRank) # Acari higher taxa
@@ -30,7 +30,7 @@ GBIF$taxonomicStatus <- ifelse(GBIF$taxonomicStatus == "homotypic synonym", "hom
                                ifelse(GBIF$taxonomicStatus == "heterotypic synonym", "heterotypicSynonym", GBIF$taxonomicStatus)) # replace non-conforming status
 
 GBIF$class <- "Arachnida" # Acari file is missing class, add it
-
+GBIF$taxonID <- as.numeric(GBIF$taxonID) # ensure that id column is numeric
 GBIF_ht <- higher_taxa_rank(GBIF, GBIF$taxonRank) # get GBIF higher taxa (DwC2taxo removes them, this is to check rows later)
 GBIF_taxo <- DwC2taxo(GBIF, source = "GBIF") # transform to taxo format
 
@@ -58,8 +58,6 @@ if(original == final) {
 Mite_m1 <- merge_lists(GBIF_taxo, Acari_taxo) # master is GBIF, merging with Acari
 Mite_mast1 <- rbind.fill(GBIF_taxo,Mite_m1$addlist,Mite_m1$noaddlist)
 Mite_mast1_1 <- cast_cs_field(Mite_mast1,"canonical","source")
-
-write.csv(Mite_mast1_1,"~/GitHub/tpt-acari/output/taxo_Acari.csv", row.names = FALSE) # taxo file
 
 # sanity check
 taxo_acari <- rbindlist(list(Acari_taxo, GBIF_taxo), fill = TRUE) # combine all taxo files
