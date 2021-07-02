@@ -6,8 +6,8 @@ devtools::install_github("vijaybarve/taxotools") # install latest version of tax
 library(readxl)
 library(data.table)
 library(stringi)
-library(dplyr)
 library(plyr)
+library(dplyr)
 library(devtools)
 library(taxotools)
 
@@ -55,6 +55,13 @@ char_fun <- function(x,y){ # x = dataframe, y = function to apply
   setDT(x)
   cols_to_be_rectified <- names(x)[vapply(x, is.character, logical(1))]
   x[,c(cols_to_be_rectified) := lapply(.SD, y), .SDcols = cols_to_be_rectified]
+}
+
+# define function VLOOKUP (x = return value dataframe and column,
+# y = lookup value dataframe and column, z = lookup dataframe and column
+# x and z should be from the same dataframe)
+vlookup <- function(x,y,z){
+  x[match(y,z)]
 }
 
 # define DwC conversion

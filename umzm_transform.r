@@ -12,7 +12,7 @@ colnames(df) <- convert2DwC(colnames(df)) # convert to DarwinCore terms
 
 df <- rbindlist(list(df, tpt_dwc_template), fill = TRUE) # add all DwC columns
 
-df$source <- "UMZM" # add dataset name
+df$source <- "TPT" # add dataset name
 df$taxonID <- seq.int(nrow(df)) # add numeric ID for each name
 
 df$kingdom <- "Animalia" # add kingdom
